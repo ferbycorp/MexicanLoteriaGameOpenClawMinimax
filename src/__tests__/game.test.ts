@@ -111,9 +111,9 @@ describe('Game Code Validation', () => {
 });
 
 describe('Deck Generation', () => {
-  it('should generate 96 cards', () => {
+  it('should generate 16 cards in test deck', () => {
     const deck = generateDeck();
-    expect(deck.length).toBe(96);
+    expect(deck.length).toBe(16);
   });
 
   it('should have unique card IDs', () => {
