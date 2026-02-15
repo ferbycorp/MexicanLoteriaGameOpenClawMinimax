@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "47247817706",
+    "project_id": "mexicanloteriagame",
+    "storage_bucket": "mexicanloteriagame.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:47247817706:android:ed4b2b4d23b616f9ae1093",
+        "android_client_info": {
+          "package_name": "com.ferbycorp.loteria"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA4lcOlm2XLdCzWsr2dsFCHdrNEtmDz61Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
