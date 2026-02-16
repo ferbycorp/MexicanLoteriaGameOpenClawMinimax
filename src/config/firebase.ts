@@ -1,11 +1,33 @@
 import { initializeApp } from 'firebase/app';
 import { getDatabase, ref, set, get, onValue, push, update, remove, serverTimestamp } from 'firebase/database';
-import { getAuth, signInAnonymously } from 'firebase/auth';
+
+const defaultDatabaseURL = 'https://mexicanloteriagame-default-rtdb.firebaseio.com';
+
+const normalizeDatabaseURL = (value?: string) => {
+  if (!value) return defaultDatabaseURL;
+
+  const trimmedValue = value.trim().replace(/\/$/, '');
+  const consoleUrlMatch = trimmedValue.match(/\/database\/([^/]+)\/data/i);
+
+  if (consoleUrlMatch?.[1]) {
+    return `https://${consoleUrlMatch[1]}.firebaseio.com`;
+  }
+
+  return trimmedValue;
+};
+
+const configuredDatabaseURL = normalizeDatabaseURL(process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL);
+
+if (!process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL) {
+  console.warn(
+    'Using fallback Firebase Realtime Database URL. Set EXPO_PUBLIC_FIREBASE_DATABASE_URL in your .env to match your Firebase console value.'
+  );
+}
 
 const firebaseConfig = {
   apiKey: "AIzaSyA4lcOlm2XLdCzWsr2dsFCHdrNEtmDz61Y",
   authDomain: "mexicanloteriagame.firebaseapp.com",
-  databaseURL: "https://mexicanloteriagame-default-rtdb.firebaseio.com",
+  databaseURL: configuredDatabaseURL,
   projectId: "mexicanloteriagame",
   storageBucket: "mexicanloteriagame.firebasestorage.app",
   messagingSenderId: "47247817706",

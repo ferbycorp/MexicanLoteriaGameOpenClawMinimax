@@ -37,8 +37,16 @@ A real-time multiplayer Mexican Lotería (Bingo) game built with React Native (E
    ```
 
 3. **Firebase config:**
-   - Firebase credentials are already configured in `src/config/firebase.ts`
-   - Database URL: `https://mexicanloteriagame-default-rtdb.firebaseio.com`
+   - Firebase client credentials are configured in `src/config/firebase.ts`
+   - Set your realtime database URL in a local `.env` file (recommended):
+
+   ```bash
+   EXPO_PUBLIC_FIREBASE_DATABASE_URL=https://<your-instance>.firebasedatabase.app
+   ```
+
+   > You can also use the `*.firebaseio.com` domain if that is what your Firebase console shows.
+
+   > Do not paste the full Console URL (`https://console.firebase.google.com/.../database/<instance>/data`). Use only the database instance URL, e.g. `https://<instance>.firebaseio.com`.
 
 4. **Run the app:**
    ```bash
