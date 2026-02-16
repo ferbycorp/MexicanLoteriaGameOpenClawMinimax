@@ -24,8 +24,9 @@ export interface GameRoom {
   currentCard: LoteriaCard | null;
   deck: LoteriaCard[];
   deckIndex: number;
+  drawIntervalMs: number;
   winner?: string;
-  winningPattern?: string[];
+  winningPattern?: number[];
   createdAt: number | null;
 }
 

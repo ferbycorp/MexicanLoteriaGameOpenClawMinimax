@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions } from 'react-native';
 import { useGame } from '../context/GameContext';
 import { LoteriaCard } from '../types';
@@ -37,7 +37,28 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     }
   }, [state.room?.status]);
 
+  useEffect(() => {
+    if (!state.isHost || !state.room || state.room.status !== 'playing') return;
+
+    const intervalMs = state.room.drawIntervalMs || 3000;
+    const timer = setInterval(() => {
+      void drawCard();
+    }, intervalMs);
+
+    return () => clearInterval(timer);
+  }, [state.isHost, state.room?.status, state.room?.drawIntervalMs, drawCard]);
+
+
+  const calledCardIds = useMemo(() => {
+    if (!state.room?.deck?.length || state.room.deckIndex < 0) return new Set<number>();
+    return new Set(state.room.deck.slice(0, state.room.deckIndex + 1).map((card) => card.id));
+  }, [state.room?.deck, state.room?.deckIndex]);
+
   const handleCardPress = (cardId: number) => {
+    if (!calledCardIds.has(cardId)) {
+      return;
+    }
+
     const newSelected = new Set(selectedCards);
     if (newSelected.has(cardId)) {
       newSelected.delete(cardId);
@@ -52,7 +73,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     await drawCard();
   };
 
-  const checkWin = (): string[] => {
+  const checkWin = (): number[] => {
     const selected = Array.from(selectedCards);
     const board = myBoard;
     
@@ -60,7 +81,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     for (let r = 0; r < 4; r++) {
       const row = [0,1,2,3].map(c => board[r * 4 + c]);
       if (row.every(cardId => selected.includes(cardId))) {
-        return row.map(id => state.room?.deck.find(c => c.id === id)?.name || '');
+        return row;
       }
     }
     
@@ -68,7 +89,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     for (let c = 0; c < 4; c++) {
       const col = [0,1,2,3].map(r => board[r * 4 + c]);
       if (col.every(cardId => selected.includes(cardId))) {
-        return col.map(id => state.room?.deck.find(c => c.id === id)?.name || '');
+        return col;
       }
     }
     
@@ -76,10 +97,10 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     const d1 = [0, 5, 10, 15].map(i => board[i]);
     const d2 = [3, 6, 9, 12].map(i => board[i]);
     if (d1.every(cardId => selected.includes(cardId))) {
-      return d1.map(id => state.room?.deck.find(c => c.id === id)?.name || '');
+      return d1;
     }
     if (d2.every(cardId => selected.includes(cardId))) {
-      return d2.map(id => state.room?.deck.find(c => c.id === id)?.name || '');
+      return d2;
     }
     
     return [];
@@ -136,7 +157,6 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   }
 
   const currentCard = state.room.currentCard;
-  const currentPlayer = state.room.players.find(p => p.id === state.playerId);
 
   return (
     <View style={styles.container}>
@@ -151,7 +171,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
 
       {/* Current Card Display */}
       <View style={styles.currentCardContainer}>
-        <Text style={styles.currentLabel}>Current Card</Text>
+        <Text style={styles.currentLabel}>Current Card • Every {(state.room.drawIntervalMs || 3000) / 1000}s</Text>
         {currentCard ? (
           <View style={styles.currentCard}>
             <Text style={styles.currentEmoji}>{currentCard.image}</Text>
@@ -181,12 +201,13 @@ export default function GameScreen({ navigation }: GameScreenProps) {
           {myBoard.map((cardId) => {
             const card = getCardDetails(cardId);
             const isSelected = selectedCards.has(cardId);
+            const isCalled = calledCardIds.has(cardId);
             return (
               <TouchableOpacity
                 key={cardId}
-                style={[styles.card, isSelected && styles.cardSelected]}
+                style={[styles.card, !isCalled && styles.cardDisabled, isSelected && styles.cardSelected]}
                 onPress={() => handleCardPress(cardId)}
-                disabled={!currentCard}
+                disabled={!currentCard || !isCalled}
               >
                 <Text style={styles.cardEmoji}>{card?.image}</Text>
                 <Text style={styles.cardName} numberOfLines={1}>{card?.name}</Text>
@@ -200,7 +221,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
       <View style={styles.actions}>
         {state.isHost && currentCard && (
           <TouchableOpacity style={styles.drawButton} onPress={handleDrawCard}>
-            <Text style={styles.drawButtonText}>Draw Next Card</Text>
+            <Text style={styles.drawButtonText}>Draw Next Card Now</Text>
           </TouchableOpacity>
         )}
         
@@ -324,6 +345,9 @@ const styles = StyleSheet.create({
   cardSelected: {
     backgroundColor: '#e94560',
     borderColor: '#e94560',
+  },
+  cardDisabled: {
+    opacity: 0.45,
   },
   cardEmoji: {
     fontSize: 24,
