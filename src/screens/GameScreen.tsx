@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, AccessibilityInfo, Platform, Image } from 'react-native';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { useGame } from '../context/GameContext';
 import { getCardAudio } from '../data/loteriaCards';
 import { LoteriaCard } from '../types';
