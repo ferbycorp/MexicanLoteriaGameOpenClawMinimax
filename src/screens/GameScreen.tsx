@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, AccessibilityInfo, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, AccessibilityInfo, Platform, Image } from 'react-native';
 import { useGame } from '../context/GameContext';
 import { LoteriaCard } from '../types';
 
@@ -187,7 +187,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
         <Text style={styles.currentLabel}>Current Card • Every {(state.room.drawIntervalMs || 3000) / 1000}s</Text>
         {currentCard ? (
           <View style={styles.currentCard}>
-            <Text style={styles.currentEmoji}>{currentCard.image}</Text>
+            <Image source={{ uri: currentCard.image }} style={styles.currentImage} resizeMode="cover" />
             <Text style={styles.currentName}>{currentCard.name}</Text>
           </View>
         ) : (
@@ -227,7 +227,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
                 onPress={() => handleCardPress(cardId)}
                 disabled={!currentCard || isDisqualified}
               >
-                <Text style={styles.cardEmoji}>{card?.image}</Text>
+                {card ? <Image source={{ uri: card.image }} style={styles.cardImage} resizeMode="cover" /> : null}
                 <Text style={styles.cardName} numberOfLines={1}>{card?.name}</Text>
               </TouchableOpacity>
             );
@@ -298,8 +298,10 @@ const styles = StyleSheet.create({
     borderColor: '#e94560',
     minWidth: 140,
   },
-  currentEmoji: {
-    fontSize: 48,
+  currentImage: {
+    width: 120,
+    height: 180,
+    borderRadius: 8,
   },
   currentName: {
     color: '#fff',
@@ -379,8 +381,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#e94560',
     borderColor: '#e94560',
   },
-  cardEmoji: {
-    fontSize: 24,
+  cardImage: {
+    width: CARD_SIZE - 16,
+    height: CARD_SIZE - 34,
+    borderRadius: 6,
   },
   cardName: {
     color: '#fff',
