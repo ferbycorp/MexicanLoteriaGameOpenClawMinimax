@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, AccessibilityInfo, Platform, Image } from 'react-native';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { useGame } from '../context/GameContext';
 import { getCardAudio } from '../data/loteriaCards';
 import { LoteriaCard } from '../types';
@@ -46,7 +47,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   const [myBoard, setMyBoard] = useState<number[]>([]);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
   const activeWebAudioRef = useRef<{ pause: () => void; currentTime: number } | null>(null);
-  const activeNativeSoundRef = useRef<{ stopAsync: () => Promise<void>; unloadAsync: () => Promise<void> } | null>(null);
+  const activeNativeSoundRef = useRef<Audio.Sound | null>(null);
 
   // Initialize board with 16 random cards
   useEffect(() => {
@@ -104,18 +105,14 @@ export default function GameScreen({ navigation }: GameScreenProps) {
         return;
       }
 
-      const expoAV = loadExpoAV();
-      if (!expoAV) {
-        console.warn('expo-av is required for native card audio playback. Run: npx expo install expo-av');
-        return;
-      }
-
       try {
-        await expoAV.Audio.setAudioModeAsync({
+        await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
           staysActiveInBackground: false,
           playsInSilentModeIOS: true,
           shouldDuckAndroid: true,
+          interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
           playThroughEarpieceAndroid: false,
         });
 
@@ -125,7 +122,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
           activeNativeSoundRef.current = null;
         }
 
-        const { sound } = await expoAV.Audio.Sound.createAsync(audioAsset, { shouldPlay: true });
+        const { sound } = await Audio.Sound.createAsync(audioAsset, { shouldPlay: true });
         activeNativeSoundRef.current = sound;
       } catch (error) {
         console.warn('Unable to play native card audio', error);
