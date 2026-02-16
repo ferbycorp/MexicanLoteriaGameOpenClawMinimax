@@ -36,55 +36,49 @@ type NativeAudioApi = {
 
 const loadNativeAudioApi = (): NativeAudioApi | null => {
   try {
-    const dynamicRequire = (globalThis as any).eval?.('require') as ((moduleName: string) => any) | undefined;
-    if (!dynamicRequire) return null;
+    // Metro/React Native runtime supports `require` here; avoid eval-based loading.
+    const expoAudio = require('expo-audio');
+    const setAudioMode = expoAudio?.setAudioModeAsync;
+    const createAudioPlayer = expoAudio?.createAudioPlayer;
 
-    try {
-      const expoAudio = dynamicRequire('expo-audio');
-      const setAudioMode = expoAudio?.setAudioModeAsync;
-      const createAudioPlayer = expoAudio?.createAudioPlayer;
-
-      if (typeof setAudioMode === 'function' && typeof createAudioPlayer === 'function') {
-        return {
-          mode: 'expo-audio',
-          setAudioMode,
-          createPlayer: async (source: number) => {
-            const player = createAudioPlayer(source);
-            if (player?.play) {
-              await player.play();
-            } else if (player?.playAsync) {
-              await player.playAsync();
-            }
-            return player;
-          },
-        };
-      }
-    } catch {
-      // Fallback handled below.
+    if (typeof setAudioMode === 'function' && typeof createAudioPlayer === 'function') {
+      return {
+        mode: 'expo-audio',
+        setAudioMode,
+        createPlayer: async (source: number) => {
+          const player = createAudioPlayer(source);
+          if (player?.play) {
+            await player.play();
+          } else if (player?.playAsync) {
+            await player.playAsync();
+          }
+          return player;
+        },
+      };
     }
+  } catch {
+    // Fallback handled below.
+  }
 
-    try {
-      const expoAV = dynamicRequire('expo-av');
-      const Audio = expoAV?.Audio;
+  try {
+    const expoAV = require('expo-av');
+    const Audio = expoAV?.Audio;
 
-      if (Audio?.Sound?.createAsync && Audio?.setAudioModeAsync) {
-        return {
-          mode: 'expo-av',
-          setAudioMode: Audio.setAudioModeAsync,
-          createPlayer: async (source: number) => {
-            const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
-            return sound;
-          },
-        };
-      }
-    } catch {
-      return null;
+    if (Audio?.Sound?.createAsync && Audio?.setAudioModeAsync) {
+      return {
+        mode: 'expo-av',
+        setAudioMode: Audio.setAudioModeAsync,
+        createPlayer: async (source: number) => {
+          const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
+          return sound;
+        },
+      };
     }
-
-    return null;
   } catch {
     return null;
   }
+
+  return null;
 };
 
 const stopAndReleasePlayer = async (player: NativePlayer | null) => {
