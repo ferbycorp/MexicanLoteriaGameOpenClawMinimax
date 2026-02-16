@@ -184,22 +184,21 @@ export default function GameScreen({ navigation }: GameScreenProps) {
       }
 
       try {
-        const sharedAudioMode = {
-          allowsRecordingIOS: false,
-          staysActiveInBackground: false,
-          playsInSilentModeIOS: true,
-          shouldDuckAndroid: true,
-          playThroughEarpieceAndroid: false,
-        };
-
         if (audioApi.mode === 'expo-audio') {
           await audioApi.setAudioMode({
-            ...sharedAudioMode,
+            allowsRecording: false,
+            playsInSilentMode: true,
+            shouldPlayInBackground: false,
+            shouldRouteThroughEarpiece: false,
             interruptionMode: 'duckOthers',
           });
         } else {
           await audioApi.setAudioMode({
-            ...sharedAudioMode,
+            allowsRecordingIOS: false,
+            staysActiveInBackground: false,
+            playsInSilentModeIOS: true,
+            shouldDuckAndroid: true,
+            playThroughEarpieceAndroid: false,
             interruptionModeIOS: 2,
             interruptionModeAndroid: 2,
           });
