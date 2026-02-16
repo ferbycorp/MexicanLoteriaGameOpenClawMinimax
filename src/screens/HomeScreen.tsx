@@ -21,9 +21,6 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       return;
     }
     await createGame(playerName.trim());
-    if (state.roomId && !state.error) {
-      navigation.navigate('WaitingRoom');
-    }
   };
 
   const handleJoinGame = async () => {
@@ -36,10 +33,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       return;
     }
     await joinGame(gameCode.trim().toUpperCase(), playerName.trim());
+  };
+
+  React.useEffect(() => {
     if (state.roomId && !state.error) {
       navigation.navigate('WaitingRoom');
     }
-  };
+  }, [state.roomId, state.error, navigation]);
 
   React.useEffect(() => {
     if (state.error) {
