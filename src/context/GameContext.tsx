@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 import { GameState, GameAction, GameRoom } from '../types';
 import * as firebase from '../config/firebase';
+
+
+const createPlayerId = () => {
+  const randomSegment = Math.random().toString(36).slice(2, 10);
+  return `player-${Date.now()}-${randomSegment}`;
+};
 
 const initialState: GameState = {
   roomId: null,
@@ -64,7 +69,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let playerId = state.playerId;
     if (!playerId) {
-      playerId = uuidv4();
+      playerId = createPlayerId();
       dispatch({ type: 'JOIN_ROOM', payload: { 
         roomId: '', gameCode: '', playerId, playerName: '', isHost: false 
       }});
@@ -85,7 +90,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const createGame = async (hostName: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const playerId = state.playerId || uuidv4();
+      const playerId = state.playerId || createPlayerId();
       const { roomId, gameCode } = await firebase.createGameRoom(hostName, playerId);
       dispatch({
         type: 'JOIN_ROOM',
@@ -99,7 +104,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const joinGame = async (gameCode: string, playerName: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const playerId = state.playerId || uuidv4();
+      const playerId = state.playerId || createPlayerId();
       const roomId = await firebase.joinGameRoom(gameCode, playerName, playerId);
       dispatch({
         type: 'JOIN_ROOM',
@@ -113,11 +118,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const joinByLink = async (roomId: string, playerName: string) => {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
-      const playerId = state.playerId || uuidv4();
-      // Get game code from room
-      const room = await firebase.get(ref(firebase.database, `rooms/${roomId}`));
-      const gameCode = room.val()?.gameCode;
-      
+      const playerId = state.playerId || createPlayerId();
+      const room = await firebase.joinRoomById(roomId, playerName, playerId);
+      const gameCode = room?.gameCode;
+
       dispatch({
         type: 'JOIN_ROOM',
         payload: { roomId, gameCode, playerId, playerName, isHost: false },

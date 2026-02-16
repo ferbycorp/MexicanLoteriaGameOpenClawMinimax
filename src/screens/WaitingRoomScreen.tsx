@@ -1,17 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Share, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, Share, FlatList } from 'react-native';
 import { useGame } from '../context/GameContext';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Player } from '../types';
 
-type RootStackParamList = {
-  Home: undefined;
-  WaitingRoom: undefined;
-  Game: undefined;
+type AppNavigation = {
+  navigate: (screen: 'Home' | 'WaitingRoom' | 'Game') => void;
 };
 
 type WaitingRoomScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'WaitingRoom'>;
+  navigation: AppNavigation;
 };
 
 export default function WaitingRoomScreen({ navigation }: WaitingRoomScreenProps) {
@@ -124,7 +121,7 @@ export default function WaitingRoomScreen({ navigation }: WaitingRoomScreenProps
             </TouchableOpacity>
             {!allPlayersReady && (
               <Text style={styles.hintText}>
-                {state.room?.players.length || 0 < 2 
+                {(state.room?.players.length || 0) < 2 
                   ? 'Need at least 2 players' 
                   : 'All players must be ready'}
               </Text>
