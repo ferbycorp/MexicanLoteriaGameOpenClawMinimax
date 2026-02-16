@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, AccessibilityInfo, Platform, Image } from 'react-native';
 import { useGame } from '../context/GameContext';
+import { getCardAudio } from '../data/loteriaCards';
 import { LoteriaCard } from '../types';
 
 type AppNavigation = {
@@ -17,6 +18,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   const { state, drawCard, claimBingo, leaveGame } = useGame();
   const [myBoard, setMyBoard] = useState<number[]>([]);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
+  const activeAudioRef = useRef<{ pause: () => void; currentTime: number } | null>(null);
 
   // Initialize board with 16 random cards
   useEffect(() => {
@@ -48,28 +50,36 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     if (!currentCard || state.room?.status !== 'playing') return;
 
     const announcement = `Carta: ${currentCard.name}`;
+    const audioAsset = getCardAudio(currentCard.id);
 
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(announcement);
-      utterance.lang = 'es-MX';
-      utterance.rate = 0.95;
-      utterance.pitch = 1;
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && audioAsset) {
+      try {
+        const assetSource = Image.resolveAssetSource(audioAsset);
 
-      // Some browsers delay voice loading; default voice still speaks if none is selected.
-      const preferredVoice = window.speechSynthesis
-        .getVoices()
-        .find((voice) => voice.lang.startsWith('es'));
+        if (activeAudioRef.current) {
+          activeAudioRef.current.pause();
+          activeAudioRef.current.currentTime = 0;
+        }
 
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
+        const audio = new window.Audio(assetSource.uri);
+        audio.preload = 'auto';
+        void audio.play();
+        activeAudioRef.current = audio;
+      } catch (error) {
+        console.warn('Unable to play card audio', error);
       }
-
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
     }
 
     void AccessibilityInfo.announceForAccessibility(announcement);
   }, [state.room?.currentCard?.id, state.room?.status]);
+
+  useEffect(() => () => {
+    if (!activeAudioRef.current) return;
+
+    activeAudioRef.current.pause();
+    activeAudioRef.current.currentTime = 0;
+    activeAudioRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!state.isHost || !state.room || state.room.status !== 'playing') return;
