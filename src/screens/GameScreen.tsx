@@ -14,11 +14,39 @@ type GameScreenProps = {
 
 const CARD_SIZE = Math.floor((Dimensions.get('window').width - 48 - 16) / 4);
 
+
+type ExpoAVModule = {
+  Audio: {
+    Sound: {
+      createAsync: (source: number, initialStatus?: { shouldPlay?: boolean }) => Promise<{ sound: { stopAsync: () => Promise<void>; unloadAsync: () => Promise<void> } }>;
+    };
+    setAudioModeAsync: (mode: {
+      allowsRecordingIOS?: boolean;
+      staysActiveInBackground?: boolean;
+      playsInSilentModeIOS?: boolean;
+      shouldDuckAndroid?: boolean;
+      playThroughEarpieceAndroid?: boolean;
+    }) => Promise<void>;
+  };
+};
+
+const loadExpoAV = (): ExpoAVModule | null => {
+  try {
+    const dynamicRequire = (globalThis as any).eval?.('require') as ((moduleName: string) => ExpoAVModule) | undefined;
+    if (!dynamicRequire) return null;
+
+    return dynamicRequire('expo-av');
+  } catch {
+    return null;
+  }
+};
+
 export default function GameScreen({ navigation }: GameScreenProps) {
   const { state, drawCard, claimBingo, leaveGame } = useGame();
   const [myBoard, setMyBoard] = useState<number[]>([]);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
-  const activeAudioRef = useRef<{ pause: () => void; currentTime: number } | null>(null);
+  const activeWebAudioRef = useRef<{ pause: () => void; currentTime: number } | null>(null);
+  const activeNativeSoundRef = useRef<{ stopAsync: () => Promise<void>; unloadAsync: () => Promise<void> } | null>(null);
 
   // Initialize board with 16 random cards
   useEffect(() => {
@@ -52,33 +80,81 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     const announcement = `Carta: ${currentCard.name}`;
     const audioAsset = getCardAudio(currentCard.id);
 
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && audioAsset) {
-      try {
-        const assetSource = Image.resolveAssetSource(audioAsset);
+    const playCardAudio = async () => {
+      if (!audioAsset) return;
 
-        if (activeAudioRef.current) {
-          activeAudioRef.current.pause();
-          activeAudioRef.current.currentTime = 0;
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          const assetSource = Image.resolveAssetSource(audioAsset);
+          if (!assetSource?.uri) return;
+
+          if (activeWebAudioRef.current) {
+            activeWebAudioRef.current.pause();
+            activeWebAudioRef.current.currentTime = 0;
+          }
+
+          const audio = new window.Audio(assetSource.uri);
+          audio.preload = 'auto';
+          await audio.play();
+          activeWebAudioRef.current = audio;
+        } catch (error) {
+          console.warn('Unable to play web card audio', error);
         }
 
-        const audio = new window.Audio(assetSource.uri);
-        audio.preload = 'auto';
-        void audio.play();
-        activeAudioRef.current = audio;
-      } catch (error) {
-        console.warn('Unable to play card audio', error);
+        return;
       }
-    }
 
+      const expoAV = loadExpoAV();
+      if (!expoAV) {
+        console.warn('expo-av is required for native card audio playback. Run: npx expo install expo-av');
+        return;
+      }
+
+      try {
+        await expoAV.Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          playThroughEarpieceAndroid: false,
+        });
+
+        if (activeNativeSoundRef.current) {
+          await activeNativeSoundRef.current.stopAsync();
+          await activeNativeSoundRef.current.unloadAsync();
+          activeNativeSoundRef.current = null;
+        }
+
+        const { sound } = await expoAV.Audio.Sound.createAsync(audioAsset, { shouldPlay: true });
+        activeNativeSoundRef.current = sound;
+      } catch (error) {
+        console.warn('Unable to play native card audio', error);
+      }
+    };
+
+    void playCardAudio();
     void AccessibilityInfo.announceForAccessibility(announcement);
   }, [state.room?.currentCard?.id, state.room?.status]);
 
   useEffect(() => () => {
-    if (!activeAudioRef.current) return;
+    if (activeWebAudioRef.current) {
+      activeWebAudioRef.current.pause();
+      activeWebAudioRef.current.currentTime = 0;
+      activeWebAudioRef.current = null;
+    }
 
-    activeAudioRef.current.pause();
-    activeAudioRef.current.currentTime = 0;
-    activeAudioRef.current = null;
+    if (!activeNativeSoundRef.current) return;
+
+    void (async () => {
+      try {
+        await activeNativeSoundRef.current?.stopAsync();
+        await activeNativeSoundRef.current?.unloadAsync();
+      } catch (error) {
+        console.warn('Unable to cleanup native card audio', error);
+      } finally {
+        activeNativeSoundRef.current = null;
+      }
+    })();
   }, []);
 
   useEffect(() => {
