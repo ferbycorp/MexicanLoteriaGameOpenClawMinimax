@@ -15,6 +15,33 @@ type GameScreenProps = {
 
 const CARD_SIZE = Math.floor((Dimensions.get('window').width - 48 - 16) / 4);
 
+
+type ExpoAVModule = {
+  Audio: {
+    Sound: {
+      createAsync: (source: number, initialStatus?: { shouldPlay?: boolean }) => Promise<{ sound: { stopAsync: () => Promise<void>; unloadAsync: () => Promise<void> } }>;
+    };
+    setAudioModeAsync: (mode: {
+      allowsRecordingIOS?: boolean;
+      staysActiveInBackground?: boolean;
+      playsInSilentModeIOS?: boolean;
+      shouldDuckAndroid?: boolean;
+      playThroughEarpieceAndroid?: boolean;
+    }) => Promise<void>;
+  };
+};
+
+const loadExpoAV = (): ExpoAVModule | null => {
+  try {
+    const dynamicRequire = (globalThis as any).eval?.('require') as ((moduleName: string) => ExpoAVModule) | undefined;
+    if (!dynamicRequire) return null;
+
+    return dynamicRequire('expo-av');
+  } catch {
+    return null;
+  }
+};
+
 export default function GameScreen({ navigation }: GameScreenProps) {
   const { state, drawCard, claimBingo, leaveGame } = useGame();
   const [myBoard, setMyBoard] = useState<number[]>([]);
