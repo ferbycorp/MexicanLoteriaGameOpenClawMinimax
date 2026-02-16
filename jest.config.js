@@ -5,7 +5,7 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json', 'node'],
   moduleNameMapper: {
-    '\.(png|jpg|jpeg|gif|webp)$': '<rootDir>/src/__mocks__/fileMock.ts'
+    '\.(png|jpg|jpeg|gif|webp|mp3)$': '<rootDir>/src/__mocks__/fileMock.ts'
   },
   transform: {
     '^.+\\.tsx?$': ['ts-jest', {
