@@ -85,6 +85,44 @@ export const joinGameRoom = async (gameCode: string, playerName: string, playerI
   return roomId;
 };
 
+export const getRoomById = async (roomId: string) => {
+  const roomRef = ref(db, `rooms/${roomId}`);
+  const snapshot = await get(roomRef);
+  return snapshot.val();
+};
+
+export const joinRoomById = async (roomId: string, playerName: string, playerId: string) => {
+  const roomRef = ref(db, `rooms/${roomId}`);
+  const roomSnapshot = await get(roomRef);
+  const room = roomSnapshot.val();
+
+  if (!room || room.status !== 'waiting') {
+    throw new Error('Game not found or already started');
+  }
+
+  const players = room.players || [];
+
+  if (players.length >= 8) {
+    throw new Error('Room is full (max 8 players)');
+  }
+
+  const newPlayer = {
+    id: playerId,
+    name: playerName,
+    isHost: false,
+    joinedAt: serverTimestamp(),
+    score: 0,
+    gamesWon: 0,
+    isReady: false
+  };
+
+  await update(ref(db, `rooms/${roomId}/players`), {
+    [players.length]: newPlayer
+  });
+
+  return room;
+};
+
 export const subscribeToRoom = (roomId: string, callback: (room: any) => void) => {
   const roomRef = ref(db, `rooms/${roomId}`);
   return onValue(roomRef, (snapshot) => {
