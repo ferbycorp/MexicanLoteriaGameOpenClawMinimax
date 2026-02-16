@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, AccessibilityInfo, Platform } from 'react-native';
 import { useGame } from '../context/GameContext';
 import { LoteriaCard } from '../types';
 
@@ -29,13 +29,34 @@ export default function GameScreen({ navigation }: GameScreenProps) {
 
   useEffect(() => {
     if (state.room?.status === 'finished') {
+      const gameOverMessage = state.room.falseClaimedBy
+        ? state.room.winner
+          ? `${state.room.falseClaimedBy} made a false Lotería claim and was disqualified. ${state.room.winner} wins!`
+          : `${state.room.falseClaimedBy} made a false Lotería claim and was disqualified.`
+        : `${state.room.winner || 'Someone'} won!`;
+
       Alert.alert(
         'Game Over!',
-        `${state.room.winner || 'Someone'} won!`,
+        gameOverMessage,
         [{ text: 'OK', onPress: () => navigation.navigate('WaitingRoom') }]
       );
     }
   }, [state.room?.status]);
+
+  useEffect(() => {
+    const currentCardName = state.room?.currentCard?.name;
+    if (!currentCardName || state.room?.status !== 'playing') return;
+
+    const announcement = `Carta: ${currentCardName}`;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(announcement));
+      return;
+    }
+
+    void AccessibilityInfo.announceForAccessibility(announcement);
+  }, [state.room?.currentCard?.id, state.room?.status]);
 
   useEffect(() => {
     if (!state.isHost || !state.room || state.room.status !== 'playing') return;
@@ -49,16 +70,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   }, [state.isHost, state.room?.status, state.room?.drawIntervalMs, drawCard]);
 
 
-  const calledCardIds = useMemo(() => {
-    if (!state.room?.deck?.length || state.room.deckIndex < 0) return new Set<number>();
-    return new Set(state.room.deck.slice(0, state.room.deckIndex + 1).map((card) => card.id));
-  }, [state.room?.deck, state.room?.deckIndex]);
-
   const handleCardPress = (cardId: number) => {
-    if (!calledCardIds.has(cardId)) {
-      return;
-    }
-
     const newSelected = new Set(selectedCards);
     if (newSelected.has(cardId)) {
       newSelected.delete(cardId);
@@ -157,6 +169,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   }
 
   const currentCard = state.room.currentCard;
+  const isDisqualified = Boolean(state.playerId && state.room.disqualifiedPlayerIds?.includes(state.playerId));
 
   return (
     <View style={styles.container}>
@@ -184,6 +197,12 @@ export default function GameScreen({ navigation }: GameScreenProps) {
         )}
       </View>
 
+      {isDisqualified && (
+        <View style={styles.disqualifiedBanner}>
+          <Text style={styles.disqualifiedText}>You are disqualified for a false claim. You can watch, but cannot keep playing this round.</Text>
+        </View>
+      )}
+
       {/* Players Score */}
       <ScrollView horizontal style={styles.scoreboard} showsHorizontalScrollIndicator={false}>
         {state.room.players.map((player) => (
@@ -201,13 +220,12 @@ export default function GameScreen({ navigation }: GameScreenProps) {
           {myBoard.map((cardId) => {
             const card = getCardDetails(cardId);
             const isSelected = selectedCards.has(cardId);
-            const isCalled = calledCardIds.has(cardId);
             return (
               <TouchableOpacity
                 key={cardId}
-                style={[styles.card, !isCalled && styles.cardDisabled, isSelected && styles.cardSelected]}
+                style={[styles.card, isSelected && styles.cardSelected]}
                 onPress={() => handleCardPress(cardId)}
-                disabled={!currentCard || !isCalled}
+                disabled={!currentCard || isDisqualified}
               >
                 <Text style={styles.cardEmoji}>{card?.image}</Text>
                 <Text style={styles.cardName} numberOfLines={1}>{card?.name}</Text>
@@ -219,16 +237,16 @@ export default function GameScreen({ navigation }: GameScreenProps) {
 
       {/* Action Buttons */}
       <View style={styles.actions}>
-        {state.isHost && currentCard && (
+        {state.isHost && currentCard && !isDisqualified && (
           <TouchableOpacity style={styles.drawButton} onPress={handleDrawCard}>
             <Text style={styles.drawButtonText}>Draw Next Card Now</Text>
           </TouchableOpacity>
         )}
         
         <TouchableOpacity 
-          style={[styles.bingoButton, selectedCards.size < 4 && styles.bingoButtonDisabled]}
+          style={[styles.bingoButton, (selectedCards.size < 4 || isDisqualified) && styles.bingoButtonDisabled]}
           onPress={handleClaimBingo}
-          disabled={selectedCards.size < 4}
+          disabled={selectedCards.size < 4 || isDisqualified}
         >
           <Text style={styles.bingoButtonText}>BINGO!</Text>
         </TouchableOpacity>
@@ -290,6 +308,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  disqualifiedBanner: {
+    marginHorizontal: 20,
+    marginBottom: 10,
+    backgroundColor: '#5c1f27',
+    borderWidth: 1,
+    borderColor: '#e94560',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  disqualifiedText: {
+    color: '#ffd9de',
+    fontSize: 12,
+    textAlign: 'center',
+  },
   scoreboard: {
     maxHeight: 70,
     paddingHorizontal: 20,
@@ -345,9 +378,6 @@ const styles = StyleSheet.create({
   cardSelected: {
     backgroundColor: '#e94560',
     borderColor: '#e94560',
-  },
-  cardDisabled: {
-    opacity: 0.45,
   },
   cardEmoji: {
     fontSize: 24,

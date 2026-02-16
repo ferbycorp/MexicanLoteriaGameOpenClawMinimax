@@ -27,6 +27,8 @@ export interface GameRoom {
   drawIntervalMs: number;
   winner?: string;
   winningPattern?: number[];
+  falseClaimedBy?: string;
+  disqualifiedPlayerIds?: string[];
   createdAt: number | null;
 }
 
