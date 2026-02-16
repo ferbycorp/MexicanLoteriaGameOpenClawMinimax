@@ -171,7 +171,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     try {
       const isValidClaim = await firebase.claimBingo(state.roomId, state.playerId, pattern);
       if (!isValidClaim) {
-        dispatch({ type: 'SET_ERROR', payload: 'Invalid Lotería claim. Make sure all cards in your line were already called.' });
+        dispatch({ type: 'SET_ERROR', payload: 'False Lotería claim. The game is over and you lose this round.' });
       }
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });

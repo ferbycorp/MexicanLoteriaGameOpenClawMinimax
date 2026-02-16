@@ -182,7 +182,11 @@ export const startGame = async (roomId: string) => {
     deck,
     deckIndex: 0,
     drawIntervalMs: room.drawIntervalMs || 3000,
-    currentCard: deck[0]
+    currentCard: deck[0],
+    winner: null,
+    winningPattern: null,
+    falseClaimedBy: null,
+    disqualifiedPlayerIds: []
   });
 };
 
@@ -221,6 +225,14 @@ export const claimBingo = async (roomId: string, playerId: string, pattern: numb
 
   if (playerIndex === -1) return false;
 
+  const disqualifiedPlayerIds: string[] = Array.isArray(room.disqualifiedPlayerIds)
+    ? room.disqualifiedPlayerIds
+    : [];
+
+  if (disqualifiedPlayerIds.includes(playerId)) {
+    return false;
+  }
+
   const normalizedPattern = Array.isArray(pattern)
     ? [...new Set(pattern.map((cardId) => Number(cardId)).filter((cardId) => Number.isInteger(cardId)))]
     : [];
@@ -233,6 +245,20 @@ export const claimBingo = async (roomId: string, playerId: string, pattern: numb
 
   const hasOnlyCalledCards = normalizedPattern.every((cardId) => calledCards.has(cardId));
   if (!hasOnlyCalledCards) {
+    const falseClaimer = players[playerIndex];
+    const updatedDisqualifiedIds = [...new Set([...disqualifiedPlayerIds, playerId])];
+
+    const activePlayers = players.filter((p: any) => !updatedDisqualifiedIds.includes(p.id));
+    const onlyOnePlayerRemaining = activePlayers.length === 1;
+
+    await update(roomRef, {
+      disqualifiedPlayerIds: updatedDisqualifiedIds,
+      falseClaimedBy: falseClaimer?.name || 'A player',
+      status: onlyOnePlayerRemaining ? 'finished' : 'playing',
+      winner: onlyOnePlayerRemaining ? activePlayers[0].name : null,
+      winningPattern: null
+    });
+
     return false;
   }
 
@@ -240,6 +266,7 @@ export const claimBingo = async (roomId: string, playerId: string, pattern: numb
     ['players/' + playerIndex + '/score']: (players[playerIndex].score || 0) + 1,
     ['players/' + playerIndex + '/gamesWon']: (players[playerIndex].gamesWon || 0) + 1,
     status: 'finished',
+    falseClaimedBy: null,
     winner: players[playerIndex].name,
     winningPattern: normalizedPattern
   });
