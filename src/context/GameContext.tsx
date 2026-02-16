@@ -54,8 +54,9 @@ interface GameContextType {
   joinByLink: (roomId: string, playerName: string) => Promise<void>;
   startGame: () => Promise<void>;
   drawCard: () => Promise<void>;
+  updateDrawInterval: (intervalMs: number) => Promise<void>;
   toggleReady: () => Promise<void>;
-  claimBingo: (pattern: string[]) => Promise<void>;
+  claimBingo: (pattern: number[]) => Promise<void>;
   leaveGame: () => Promise<void>;
   clearError: () => void;
 }
@@ -156,10 +157,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
     await firebase.updatePlayerReady(state.roomId, state.playerId, newReadyState);
   };
 
-  const claimBingo = async (pattern: string[]) => {
+  const updateDrawInterval = async (intervalMs: number) => {
+    if (!state.roomId || !state.isHost) return;
+    try {
+      await firebase.updateDrawInterval(state.roomId, intervalMs);
+    } catch (error: any) {
+      dispatch({ type: 'SET_ERROR', payload: error.message });
+    }
+  };
+
+  const claimBingo = async (pattern: number[]) => {
     if (!state.roomId || !state.playerId) return;
     try {
-      await firebase.claimBingo(state.roomId, state.playerId, pattern);
+      const isValidClaim = await firebase.claimBingo(state.roomId, state.playerId, pattern);
+      if (!isValidClaim) {
+        dispatch({ type: 'SET_ERROR', payload: 'Invalid Lotería claim. Make sure all cards in your line were already called.' });
+      }
     } catch (error: any) {
       dispatch({ type: 'SET_ERROR', payload: error.message });
     }
@@ -188,6 +201,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         joinByLink,
         startGame,
         drawCard,
+        updateDrawInterval,
         toggleReady,
         claimBingo,
         leaveGame,

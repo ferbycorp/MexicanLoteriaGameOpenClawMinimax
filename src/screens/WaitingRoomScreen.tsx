@@ -11,8 +11,16 @@ type WaitingRoomScreenProps = {
   navigation: AppNavigation;
 };
 
+
+const DRAW_SPEED_OPTIONS = [
+  { label: '1s', value: 1000 },
+  { label: '2s', value: 2000 },
+  { label: '3s', value: 3000 },
+  { label: '5s', value: 5000 },
+];
+
 export default function WaitingRoomScreen({ navigation }: WaitingRoomScreenProps) {
-  const { state, startGame, toggleReady, leaveGame } = useGame();
+  const { state, startGame, toggleReady, updateDrawInterval, leaveGame } = useGame();
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -32,6 +40,10 @@ export default function WaitingRoomScreen({ navigation }: WaitingRoomScreenProps
 
   const handleToggleReady = async () => {
     await toggleReady();
+  };
+
+  const handleDrawSpeedChange = async (intervalMs: number) => {
+    await updateDrawInterval(intervalMs);
   };
 
   const handleLeave = () => {
@@ -108,6 +120,27 @@ export default function WaitingRoomScreen({ navigation }: WaitingRoomScreenProps
           contentContainerStyle={styles.playersList}
         />
       </View>
+
+
+      {state.isHost && (
+        <View style={styles.speedSection}>
+          <Text style={styles.sectionTitle}>Card Speed</Text>
+          <View style={styles.speedOptions}>
+            {DRAW_SPEED_OPTIONS.map((option) => {
+              const isSelected = (state.room?.drawIntervalMs || 3000) === option.value;
+              return (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.speedButton, isSelected && styles.speedButtonSelected]}
+                  onPress={() => handleDrawSpeedChange(option.value)}
+                >
+                  <Text style={[styles.speedButtonText, isSelected && styles.speedButtonTextSelected]}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       <View style={styles.actions}>
         {state.isHost ? (
@@ -255,6 +288,34 @@ const styles = StyleSheet.create({
   readyText: {
     color: '#fff',
     fontSize: 12,
+  },
+
+  speedSection: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  speedOptions: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+  speedButton: {
+    borderWidth: 1,
+    borderColor: '#555',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  speedButtonSelected: {
+    backgroundColor: '#e94560',
+    borderColor: '#e94560',
+  },
+  speedButtonText: {
+    color: '#ccc',
+    fontWeight: '600',
+  },
+  speedButtonTextSelected: {
+    color: '#fff',
   },
   actions: {
     padding: 20,

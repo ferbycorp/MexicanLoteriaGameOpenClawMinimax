@@ -65,6 +65,19 @@ const checkWin = (board: number[], selected: Set<number>): boolean => {
   return false;
 };
 
+
+// Check if bingo claim only uses called cards
+const hasOnlyCalledCards = (pattern: number[], deck: { id: number }[], deckIndex: number): boolean => {
+  const calledCards = new Set(deck.slice(0, deckIndex + 1).map(card => card.id));
+  const normalizedPattern = [...new Set(pattern.map((id) => Number(id)).filter((id) => Number.isInteger(id)))];
+
+  if (normalizedPattern.length < 4) {
+    return false;
+  }
+
+  return normalizedPattern.every((cardId) => calledCards.has(cardId));
+};
+
 // Validate game code format
 const isValidGameCode = (code: string): boolean => {
   return /^[A-Z0-9]{6}$/.test(code);
@@ -198,5 +211,25 @@ describe('Game State Transitions', () => {
     let status = 'playing';
     status = 'finished';
     expect(status).toBe('finished');
+  });
+});
+
+
+describe('Bingo Claim Validation', () => {
+  const deck = [
+    { id: 1 }, { id: 2 }, { id: 3 }, { id: 4 },
+    { id: 5 }, { id: 6 }, { id: 7 }, { id: 8 },
+  ];
+
+  it('should allow claims when all cards were already called', () => {
+    expect(hasOnlyCalledCards([1, 2, 3, 4], deck, 4)).toBe(true);
+  });
+
+  it('should reject claims with cards not called yet', () => {
+    expect(hasOnlyCalledCards([1, 2, 3, 8], deck, 3)).toBe(false);
+  });
+
+  it('should reject claims with fewer than 4 unique cards', () => {
+    expect(hasOnlyCalledCards([1, 1, 2, 2], deck, 4)).toBe(false);
   });
 });

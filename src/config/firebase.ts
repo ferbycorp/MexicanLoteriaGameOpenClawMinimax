@@ -59,6 +59,7 @@ export const createGameRoom = async (hostName: string, hostId: string) => {
     currentCard: null,
     deck: [],
     deckIndex: 0,
+    drawIntervalMs: 3000,
     createdAt: serverTimestamp()
   };
   
@@ -164,6 +165,11 @@ export const updatePlayerReady = async (roomId: string, playerId: string, isRead
   await set(playersRef, updatedPlayers);
 };
 
+export const updateDrawInterval = async (roomId: string, intervalMs: number) => {
+  const safeIntervalMs = Math.min(10000, Math.max(1000, Math.floor(intervalMs)));
+  await update(ref(db, `rooms/${roomId}`), { drawIntervalMs: safeIntervalMs });
+};
+
 export const startGame = async (roomId: string) => {
   const roomRef = ref(db, 'rooms/' + roomId);
   const snapshot = await get(roomRef);
@@ -175,6 +181,7 @@ export const startGame = async (roomId: string) => {
     status: 'playing',
     deck,
     deckIndex: 0,
+    drawIntervalMs: room.drawIntervalMs || 3000,
     currentCard: deck[0]
   });
 };
@@ -202,24 +209,41 @@ export const drawNextCard = async (roomId: string) => {
   return room.deck[newIndex];
 };
 
-export const claimBingo = async (roomId: string, playerId: string, pattern: string[]) => {
+export const claimBingo = async (roomId: string, playerId: string, pattern: number[]) => {
   const roomRef = ref(db, 'rooms/' + roomId);
   const snapshot = await get(roomRef);
   const room = snapshot.val();
-  
+
+  if (!room || room.status !== 'playing') return false;
+
   const players = room.players || [];
   const playerIndex = players.findIndex((p: any) => p.id === playerId);
-  
+
   if (playerIndex === -1) return false;
-  
+
+  const normalizedPattern = Array.isArray(pattern)
+    ? [...new Set(pattern.map((cardId) => Number(cardId)).filter((cardId) => Number.isInteger(cardId)))]
+    : [];
+
+  if (normalizedPattern.length < 4) return false;
+
+  const calledCards = new Set(
+    (room.deck || []).slice(0, (room.deckIndex || 0) + 1).map((card: any) => card.id)
+  );
+
+  const hasOnlyCalledCards = normalizedPattern.every((cardId) => calledCards.has(cardId));
+  if (!hasOnlyCalledCards) {
+    return false;
+  }
+
   await update(roomRef, {
     ['players/' + playerIndex + '/score']: (players[playerIndex].score || 0) + 1,
     ['players/' + playerIndex + '/gamesWon']: (players[playerIndex].gamesWon || 0) + 1,
     status: 'finished',
     winner: players[playerIndex].name,
-    winningPattern: pattern
+    winningPattern: normalizedPattern
   });
-  
+
   return true;
 };
 
