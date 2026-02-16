@@ -200,7 +200,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
         <Text style={styles.currentLabel}>Current Card • Every {(state.room.drawIntervalMs || 3000) / 1000}s</Text>
         {currentCard ? (
           <View style={styles.currentCard}>
-            <Image source={{ uri: currentCard.image }} style={styles.currentImage} resizeMode="cover" />
+            <Image source={currentCard.image} style={styles.currentImage} resizeMode="cover" />
             <Text style={styles.currentName}>{currentCard.name}</Text>
           </View>
         ) : (
@@ -240,7 +240,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
                 onPress={() => handleCardPress(cardId)}
                 disabled={!currentCard || isDisqualified}
               >
-                {card ? <Image source={{ uri: card.image }} style={styles.cardImage} resizeMode="cover" /> : null}
+                {card ? <Image source={card.image} style={styles.cardImage} resizeMode="cover" /> : null}
                 <Text style={styles.cardName} numberOfLines={1}>{card?.name}</Text>
               </TouchableOpacity>
             );
