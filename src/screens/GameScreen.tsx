@@ -44,15 +44,28 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   }, [state.room?.status]);
 
   useEffect(() => {
-    const currentCardName = state.room?.currentCard?.name;
-    if (!currentCardName || state.room?.status !== 'playing') return;
+    const currentCard = state.room?.currentCard;
+    if (!currentCard || state.room?.status !== 'playing') return;
 
-    const announcement = `Carta: ${currentCardName}`;
+    const announcement = `Carta: ${currentCard.name}`;
 
     if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(announcement);
+      utterance.lang = 'es-MX';
+      utterance.rate = 0.95;
+      utterance.pitch = 1;
+
+      // Some browsers delay voice loading; default voice still speaks if none is selected.
+      const preferredVoice = window.speechSynthesis
+        .getVoices()
+        .find((voice) => voice.lang.startsWith('es'));
+
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
       window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(announcement));
-      return;
+      window.speechSynthesis.speak(utterance);
     }
 
     void AccessibilityInfo.announceForAccessibility(announcement);
