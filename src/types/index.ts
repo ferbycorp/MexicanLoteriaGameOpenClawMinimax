@@ -14,6 +14,7 @@ export interface LoteriaCard {
   id: number;
   name: string;
   image: ImageSourcePropType;
+  audio?: number;
 }
 
 export interface GameRoom {

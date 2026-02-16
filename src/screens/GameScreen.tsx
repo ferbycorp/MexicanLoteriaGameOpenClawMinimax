@@ -1,6 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions, AccessibilityInfo, Platform, Image } from 'react-native';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { useGame } from '../context/GameContext';
+import { getCardAudio } from '../data/loteriaCards';
 import { LoteriaCard } from '../types';
 
 type AppNavigation = {
@@ -17,6 +19,8 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   const { state, drawCard, claimBingo, leaveGame } = useGame();
   const [myBoard, setMyBoard] = useState<number[]>([]);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
+  const activeWebAudioRef = useRef<{ pause: () => void; currentTime: number } | null>(null);
+  const activeNativeSoundRef = useRef<Audio.Sound | null>(null);
 
   // Initialize board with 16 random cards
   useEffect(() => {
@@ -48,28 +52,80 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     if (!currentCard || state.room?.status !== 'playing') return;
 
     const announcement = `Carta: ${currentCard.name}`;
+    const audioAsset = getCardAudio(currentCard.id);
 
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(announcement);
-      utterance.lang = 'es-MX';
-      utterance.rate = 0.95;
-      utterance.pitch = 1;
+    const playCardAudio = async () => {
+      if (!audioAsset) return;
 
-      // Some browsers delay voice loading; default voice still speaks if none is selected.
-      const preferredVoice = window.speechSynthesis
-        .getVoices()
-        .find((voice) => voice.lang.startsWith('es'));
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          const assetSource = Image.resolveAssetSource(audioAsset);
+          if (!assetSource?.uri) return;
 
-      if (preferredVoice) {
-        utterance.voice = preferredVoice;
+          if (activeWebAudioRef.current) {
+            activeWebAudioRef.current.pause();
+            activeWebAudioRef.current.currentTime = 0;
+          }
+
+          const audio = new window.Audio(assetSource.uri);
+          audio.preload = 'auto';
+          await audio.play();
+          activeWebAudioRef.current = audio;
+        } catch (error) {
+          console.warn('Unable to play web card audio', error);
+        }
+
+        return;
       }
 
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    }
+      try {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          staysActiveInBackground: false,
+          playsInSilentModeIOS: true,
+          shouldDuckAndroid: true,
+          interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+          playThroughEarpieceAndroid: false,
+        });
 
+        if (activeNativeSoundRef.current) {
+          await activeNativeSoundRef.current.stopAsync();
+          await activeNativeSoundRef.current.unloadAsync();
+          activeNativeSoundRef.current = null;
+        }
+
+        const { sound } = await Audio.Sound.createAsync(audioAsset, { shouldPlay: true });
+        activeNativeSoundRef.current = sound;
+      } catch (error) {
+        console.warn('Unable to play native card audio', error);
+      }
+    };
+
+    void playCardAudio();
     void AccessibilityInfo.announceForAccessibility(announcement);
   }, [state.room?.currentCard?.id, state.room?.status]);
+
+  useEffect(() => () => {
+    if (activeWebAudioRef.current) {
+      activeWebAudioRef.current.pause();
+      activeWebAudioRef.current.currentTime = 0;
+      activeWebAudioRef.current = null;
+    }
+
+    if (!activeNativeSoundRef.current) return;
+
+    void (async () => {
+      try {
+        await activeNativeSoundRef.current?.stopAsync();
+        await activeNativeSoundRef.current?.unloadAsync();
+      } catch (error) {
+        console.warn('Unable to cleanup native card audio', error);
+      } finally {
+        activeNativeSoundRef.current = null;
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!state.isHost || !state.room || state.room.status !== 'playing') return;
