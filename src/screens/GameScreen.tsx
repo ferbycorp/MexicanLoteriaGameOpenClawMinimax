@@ -15,30 +15,108 @@ type GameScreenProps = {
 
 const CARD_SIZE = Math.floor((Dimensions.get('window').width - 48 - 16) / 4);
 
-
-type ExpoAVModule = {
-  Audio: {
-    Sound: {
-      createAsync: (source: number, initialStatus?: { shouldPlay?: boolean }) => Promise<{ sound: { stopAsync: () => Promise<void>; unloadAsync: () => Promise<void> } }>;
-    };
-    setAudioModeAsync: (mode: {
-      allowsRecordingIOS?: boolean;
-      staysActiveInBackground?: boolean;
-      playsInSilentModeIOS?: boolean;
-      shouldDuckAndroid?: boolean;
-      playThroughEarpieceAndroid?: boolean;
-    }) => Promise<void>;
-  };
+type NativePlayer = {
+  play?: () => Promise<void> | void;
+  playAsync?: () => Promise<void> | void;
+  pause?: () => Promise<void> | void;
+  stop?: () => Promise<void> | void;
+  stopAsync?: () => Promise<void> | void;
+  unload?: () => Promise<void> | void;
+  unloadAsync?: () => Promise<void> | void;
+  release?: () => Promise<void> | void;
+  remove?: () => Promise<void> | void;
+  currentTime?: number;
 };
 
-const loadExpoAV = (): ExpoAVModule | null => {
+type NativeAudioApi = {
+  mode: 'expo-audio' | 'expo-av';
+  setAudioMode: (mode: Record<string, unknown>) => Promise<void>;
+  createPlayer: (source: number) => Promise<NativePlayer>;
+};
+
+const loadNativeAudioApi = (): NativeAudioApi | null => {
   try {
-    const dynamicRequire = (globalThis as any).eval?.('require') as ((moduleName: string) => ExpoAVModule) | undefined;
+    const dynamicRequire = (globalThis as any).eval?.('require') as ((moduleName: string) => any) | undefined;
     if (!dynamicRequire) return null;
 
-    return dynamicRequire('expo-av');
+    try {
+      const expoAudio = dynamicRequire('expo-audio');
+      const setAudioMode = expoAudio?.setAudioModeAsync;
+      const createAudioPlayer = expoAudio?.createAudioPlayer;
+
+      if (typeof setAudioMode === 'function' && typeof createAudioPlayer === 'function') {
+        return {
+          mode: 'expo-audio',
+          setAudioMode,
+          createPlayer: async (source: number) => {
+            const player = createAudioPlayer(source);
+            if (player?.play) {
+              await player.play();
+            } else if (player?.playAsync) {
+              await player.playAsync();
+            }
+            return player;
+          },
+        };
+      }
+    } catch {
+      // Fallback handled below.
+    }
+
+    try {
+      const expoAV = dynamicRequire('expo-av');
+      const Audio = expoAV?.Audio;
+
+      if (Audio?.Sound?.createAsync && Audio?.setAudioModeAsync) {
+        return {
+          mode: 'expo-av',
+          setAudioMode: Audio.setAudioModeAsync,
+          createPlayer: async (source: number) => {
+            const { sound } = await Audio.Sound.createAsync(source, { shouldPlay: true });
+            return sound;
+          },
+        };
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
   } catch {
     return null;
+  }
+};
+
+const stopAndReleasePlayer = async (player: NativePlayer | null) => {
+  if (!player) return;
+
+  try {
+    if (typeof player.stopAsync === 'function') {
+      await player.stopAsync();
+    } else if (typeof player.stop === 'function') {
+      await player.stop();
+    } else if (typeof player.pause === 'function') {
+      await player.pause();
+      if (typeof player.currentTime === 'number') {
+        player.currentTime = 0;
+      }
+    }
+  } catch {
+    // noop cleanup best effort
+  }
+
+  try {
+    if (typeof player.unloadAsync === 'function') {
+      await player.unloadAsync();
+    } else if (typeof player.unload === 'function') {
+      await player.unload();
+    } else if (typeof player.release === 'function') {
+      await player.release();
+    } else if (typeof player.remove === 'function') {
+      await player.remove();
+    }
+  } catch {
+    // noop cleanup best effort
   }
 };
 
@@ -47,12 +125,12 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   const [myBoard, setMyBoard] = useState<number[]>([]);
   const [selectedCards, setSelectedCards] = useState<Set<number>>(new Set());
   const activeWebAudioRef = useRef<{ pause: () => void; currentTime: number } | null>(null);
-  const activeNativeSoundRef = useRef<Audio.Sound | null>(null);
+  const activeNativePlayerRef = useRef<NativePlayer | null>(null);
 
   // Initialize board with 16 random cards
   useEffect(() => {
     if (!state.room?.deck || myBoard.length > 0) return;
-    
+
     const shuffled = [...state.room.deck].sort(() => Math.random() - 0.5);
     const boardCards = shuffled.slice(0, 16).map(c => c.id);
     setMyBoard(boardCards);
@@ -105,25 +183,40 @@ export default function GameScreen({ navigation }: GameScreenProps) {
         return;
       }
 
+      const audioApi = loadNativeAudioApi();
+      if (!audioApi) {
+        console.warn('No native audio module found. Install expo-audio (recommended) or expo-av.');
+        return;
+      }
+
       try {
-        await Audio.setAudioModeAsync({
+        const sharedAudioMode = {
           allowsRecordingIOS: false,
           staysActiveInBackground: false,
           playsInSilentModeIOS: true,
           shouldDuckAndroid: true,
-          interruptionModeIOS: InterruptionModeIOS.DuckOthers,
-          interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
           playThroughEarpieceAndroid: false,
-        });
+        };
 
-        if (activeNativeSoundRef.current) {
-          await activeNativeSoundRef.current.stopAsync();
-          await activeNativeSoundRef.current.unloadAsync();
-          activeNativeSoundRef.current = null;
+        if (audioApi.mode === 'expo-audio') {
+          await audioApi.setAudioMode({
+            ...sharedAudioMode,
+            interruptionMode: 'duckOthers',
+          });
+        } else {
+          await audioApi.setAudioMode({
+            ...sharedAudioMode,
+            interruptionModeIOS: 2,
+            interruptionModeAndroid: 2,
+          });
         }
 
-        const { sound } = await Audio.Sound.createAsync(audioAsset, { shouldPlay: true });
-        activeNativeSoundRef.current = sound;
+        if (activeNativePlayerRef.current) {
+          await stopAndReleasePlayer(activeNativePlayerRef.current);
+          activeNativePlayerRef.current = null;
+        }
+
+        activeNativePlayerRef.current = await audioApi.createPlayer(audioAsset);
       } catch (error) {
         console.warn('Unable to play native card audio', error);
       }
@@ -140,18 +233,8 @@ export default function GameScreen({ navigation }: GameScreenProps) {
       activeWebAudioRef.current = null;
     }
 
-    if (!activeNativeSoundRef.current) return;
-
-    void (async () => {
-      try {
-        await activeNativeSoundRef.current?.stopAsync();
-        await activeNativeSoundRef.current?.unloadAsync();
-      } catch (error) {
-        console.warn('Unable to cleanup native card audio', error);
-      } finally {
-        activeNativeSoundRef.current = null;
-      }
-    })();
+    void stopAndReleasePlayer(activeNativePlayerRef.current);
+    activeNativePlayerRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -184,7 +267,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
   const checkWin = (): number[] => {
     const selected = Array.from(selectedCards);
     const board = myBoard;
-    
+
     // Check rows
     for (let r = 0; r < 4; r++) {
       const row = [0,1,2,3].map(c => board[r * 4 + c]);
@@ -192,7 +275,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
         return row;
       }
     }
-    
+
     // Check columns
     for (let c = 0; c < 4; c++) {
       const col = [0,1,2,3].map(r => board[r * 4 + c]);
@@ -200,7 +283,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
         return col;
       }
     }
-    
+
     // Check diagonals
     const d1 = [0, 5, 10, 15].map(i => board[i]);
     const d2 = [3, 6, 9, 12].map(i => board[i]);
@@ -210,7 +293,7 @@ export default function GameScreen({ navigation }: GameScreenProps) {
     if (d2.every(cardId => selected.includes(cardId))) {
       return d2;
     }
-    
+
     return [];
   };
 
@@ -220,14 +303,14 @@ export default function GameScreen({ navigation }: GameScreenProps) {
       Alert.alert('No Win', "You don't have a winning pattern yet!");
       return;
     }
-    
+
     Alert.alert(
       'Claim Bingo!',
       'Do you have 4 in a row?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Claim!', 
+        {
+          text: 'Claim!',
           onPress: () => claimBingo(winningPattern)
         },
       ]
@@ -240,8 +323,8 @@ export default function GameScreen({ navigation }: GameScreenProps) {
       'Are you sure?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Leave', 
+        {
+          text: 'Leave',
           style: 'destructive',
           onPress: async () => {
             await leaveGame();
@@ -338,8 +421,8 @@ export default function GameScreen({ navigation }: GameScreenProps) {
             <Text style={styles.drawButtonText}>Draw Next Card Now</Text>
           </TouchableOpacity>
         )}
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           style={[styles.bingoButton, (selectedCards.size < 4 || isDisqualified) && styles.bingoButtonDisabled]}
           onPress={handleClaimBingo}
           disabled={selectedCards.size < 4 || isDisqualified}
