@@ -114,6 +114,11 @@ export const TRADITIONAL_LOTERIA_CARDS: LoteriaCard[] = [
   { id: 54, name: 'La Rana', image: CARD_IMAGES[54] },
 ];
 
+export const TRADITIONAL_LOTERIA_CARDS: LoteriaCard[] = CARD_NAMES.map((name, index) => {
+  const id = index + 1;
+  return { id, name, image: cardImage(name, id) };
+});
+
 export const generateDeck = () => {
   const shuffled = [...TRADITIONAL_LOTERIA_CARDS];
 
