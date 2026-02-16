@@ -1,16 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useGame } from '../context/GameContext';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-type RootStackParamList = {
-  Home: undefined;
-  WaitingRoom: undefined;
-  Game: undefined;
+type AppNavigation = {
+  navigate: (screen: 'Home' | 'WaitingRoom' | 'Game') => void;
 };
 
 type HomeScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Home'>;
+  navigation: AppNavigation;
 };
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {

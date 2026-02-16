@@ -1,17 +1,14 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Dimensions } from 'react-native';
 import { useGame } from '../context/GameContext';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { LoteriaCard } from '../types';
 
-type RootStackParamList = {
-  Home: undefined;
-  WaitingRoom: undefined;
-  Game: undefined;
+type AppNavigation = {
+  navigate: (screen: 'Home' | 'WaitingRoom' | 'Game') => void;
 };
 
 type GameScreenProps = {
-  navigation: NativeStackNavigationProp<RootStackParamList, 'Game'>;
+  navigation: AppNavigation;
 };
 
 const CARD_SIZE = Math.floor((Dimensions.get('window').width - 48 - 16) / 4);
