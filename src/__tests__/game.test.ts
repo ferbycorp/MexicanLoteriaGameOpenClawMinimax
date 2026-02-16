@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
+import { generateDeck, TRADITIONAL_LOTERIA_CARDS } from '../data/loteriaCards';
 
 // Test game logic utilities
 
@@ -10,36 +11,6 @@ const generateGameCode = () => {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
-};
-
-// Generate deck
-const generateDeck = () => {
-  const traditionalCards = [
-    { id: 1, name: 'El Gallo', image: '🐓' },
-    { id: 2, name: 'El Diablito', image: '👹' },
-    { id: 3, name: 'La Dama', image: '👸' },
-    { id: 4, name: 'El Catrín', image: '🎩' },
-    { id: 5, name: 'El Paraguas', image: '☂️' },
-    { id: 6, name: 'La Sirena', image: '🧜‍♀️' },
-    { id: 7, name: 'La Escalera', image: '🪜' },
-    { id: 8, name: 'La Botella', image: '🍾' },
-    { id: 9, name: 'El Barril', image: '🛢️' },
-    { id: 10, name: 'El Árbol', image: '🌳' },
-    { id: 11, name: 'El Alacrán', image: '🦂' },
-    { id: 12, name: 'El Rose', image: '🌹' },
-    { id: 13, name: 'La Muerte', image: '💀' },
-    { id: 14, name: 'El Pato', image: '🦆' },
-    { id: 15, name: 'El Sol', image: '☀️' },
-    { id: 16, name: 'La Luna', image: '🌙' },
-  ];
-  
-  const shuffled = [...traditionalCards];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  
-  return shuffled;
 };
 
 // Check win patterns
@@ -124,9 +95,9 @@ describe('Game Code Validation', () => {
 });
 
 describe('Deck Generation', () => {
-  it('should generate 16 cards in test deck', () => {
+  it('should generate 54 cards in deck', () => {
     const deck = generateDeck();
-    expect(deck.length).toBe(16);
+    expect(deck.length).toBe(54);
   });
 
   it('should have unique card IDs', () => {
@@ -134,6 +105,13 @@ describe('Deck Generation', () => {
     const ids = deck.map(c => c.id);
     const uniqueIds = new Set(ids);
     expect(uniqueIds.size).toBe(deck.length);
+  });
+
+  it('should only include traditional 54 card IDs', () => {
+    const traditionalIds = TRADITIONAL_LOTERIA_CARDS.map((card) => card.id);
+    expect(Math.min(...traditionalIds)).toBe(1);
+    expect(Math.max(...traditionalIds)).toBe(54);
+    expect(new Set(traditionalIds).size).toBe(54);
   });
 
   it('should have all cards with name and image', () => {
