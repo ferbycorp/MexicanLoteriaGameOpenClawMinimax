@@ -114,10 +114,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_LOADING', payload: true });
     try {
       const playerId = state.playerId || uuidv4();
-      // Get game code from room
-      const room = await firebase.get(ref(firebase.database, `rooms/${roomId}`));
-      const gameCode = room.val()?.gameCode;
-      
+      const room = await firebase.joinRoomById(roomId, playerName, playerId);
+      const gameCode = room?.gameCode;
+
       dispatch({
         type: 'JOIN_ROOM',
         payload: { roomId, gameCode, playerId, playerName, isHost: false },
