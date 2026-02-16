@@ -1,3 +1,5 @@
+import type { ImageSourcePropType } from 'react-native';
+
 export interface Player {
   id: string;
   name: string;
@@ -11,7 +13,7 @@ export interface Player {
 export interface LoteriaCard {
   id: number;
   name: string;
-  image: string;
+  image: ImageSourcePropType;
 }
 
 export interface GameRoom {
